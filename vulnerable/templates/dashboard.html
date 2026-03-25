@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+<p>Welcome, <strong>{{ current_user['email'] }}</strong>. Your role is
+<strong>{{ current_user['role'] }}</strong>.</p>
+<p>Quick actions:</p>
+<ul>
+    <li><a href="{{ url_for('tickets') }}">List tickets</a></li>
+    <li><a href="{{ url_for('ticket_create') }}">Create new ticket</a></li>
+    <li><a href="{{ url_for('ticket_search') }}">Search tickets</a></li>
+</ul>
+{% endblock %}
