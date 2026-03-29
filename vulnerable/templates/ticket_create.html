@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}New ticket{% endblock %}
+{% block content %}
+<h1>Create ticket</h1>
+<form method="post">
+    <label>Title <input type="text" name="title" required></label>
+    <label>Severity
+        <select name="severity">
+            <option value="LOW">LOW</option>
+            <option value="MED">MED</option>
+            <option value="HIGH">HIGH</option>
+        </select>
+    </label>
+    <label>Description <textarea name="description" rows="5"></textarea></label>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}
