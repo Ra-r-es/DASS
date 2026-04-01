@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Forgot password{% endblock %}
+{% block content %}
+<h1>Forgot password</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post">
+    <label>Email <input type="email" name="email" required></label>
+    <button type="submit">Generate reset link</button>
+</form>
+{% if token %}
+<p class="info">
+    <strong>Demo:</strong> in production this link would be e-mailed.
+    Reset URL:
+    <a href="{{ url_for('reset', token=token) }}">{{ url_for('reset', token=token) }}</a>
+</p>
+{% endif %}
+{% endblock %}
