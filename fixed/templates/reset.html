@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Reset password{% endblock %}
+{% block content %}
+<h1>Reset password</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if valid %}
+<form method="post">
+    <label>New password <input type="password" name="password" required autocomplete="new-password"></label>
+    <label>Confirm <input type="password" name="confirm" required autocomplete="new-password"></label>
+    <button type="submit">Reset</button>
+</form>
+<p class="info">Password rules: at least 8 characters, an uppercase letter,
+a digit, and a special character.</p>
+{% else %}
+<p>Please request a new reset link from the
+<a href="{{ url_for('forgot') }}">forgot-password</a> page.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1>Audit log</h1>
+<p>Latest 200 events.</p>
+<table>
+    <tr>
+        <th>ID</th><th>Time (UTC)</th><th>User</th><th>Action</th>
+        <th>Resource</th><th>Resource ID</th><th>IP</th>
+    </tr>
+    {% for log in logs %}
+    <tr>
+        <td>{{ log['id'] }}</td>
+        <td>{{ log['timestamp'] }}</td>
+        <td>{{ log['email'] or '-' }}</td>
+        <td>{{ log['action'] }}</td>
+        <td>{{ log['resource'] or '-' }}</td>
+        <td>{{ log['resource_id'] or '-' }}</td>
+        <td>{{ log['ip_address'] or '-' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7">No events.</td></tr>
+    {% endfor %}
+</table>
+{% endblock %}

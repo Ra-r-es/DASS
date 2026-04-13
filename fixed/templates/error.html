@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} {{ message }}{% endblock %}
+{% block content %}
+<h1>{{ code }} -- {{ message }}</h1>
+<p>The request could not be completed. No further details are disclosed.</p>
+<p><a href="{{ url_for('index') }}">Back to home</a></p>
+{% endblock %}

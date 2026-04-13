@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}AuthX{% endblock %} -- Secure</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 960px;
+               margin: 1.5em auto; padding: 0 1em; color: #222; }
+        nav { background: #2c3e50; color: #fff; padding: 0.7em 1em;
+              border-radius: 4px; margin-bottom: 1em; overflow: hidden; }
+        nav a { color: #fff; margin-right: 1em; text-decoration: none; }
+        nav .right { float: right; }
+        nav .right a { color: #fff; }
+        h1, h2 { color: #2c3e50; }
+        form { display: flex; flex-direction: column; max-width: 420px; }
+        label { margin: 0.2em 0; }
+        input, textarea, select { padding: 0.5em; margin: 0.2em 0; }
+        button { padding: 0.5em 1em; background: #2c3e50; color: #fff;
+                 border: 0; cursor: pointer; }
+        .error  { background: #f8d7da; color: #721c24;
+                  padding: 0.5em 0.8em; border-radius: 4px; }
+        .info   { background: #d4edda; color: #155724;
+                  padding: 0.5em 0.8em; border-radius: 4px; }
+        .banner { background: #d1ecf1; color: #0c5460;
+                  padding: 0.7em 1em; border-radius: 4px; margin-bottom: 1em; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 0.4em 0.6em; text-align: left;
+                 vertical-align: top; }
+        tr:nth-child(even) { background: #fafafa; }
+        code { background: #f3f3f3; padding: 0.1em 0.3em; border-radius: 3px; }
+    </style>
+</head>
+<body>
+<nav>
+    <a href="{{ url_for('index') }}"><strong>AuthX</strong></a>
+    {% if current_user %}
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('tickets') }}">Tickets</a>
+        <a href="{{ url_for('ticket_create') }}">New ticket</a>
+        <a href="{{ url_for('ticket_search') }}">Search</a>
+        {% if current_user['role'] == 'MANAGER' %}
+        <a href="{{ url_for('audit_view') }}">Audit log</a>
+        {% endif %}
+        <span class="right">
+            Logged in as <strong>{{ current_user['email'] }}</strong>
+            ({{ current_user['role'] }})
+            -- <a href="{{ url_for('logout') }}">Logout</a>
+        </span>
+    {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('register') }}">Register</a>
+        <a href="{{ url_for('forgot') }}">Forgot password</a>
+    {% endif %}
+</nav>
+{% block content %}{% endblock %}
+</body>
+</html>

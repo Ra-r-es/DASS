@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}New ticket{% endblock %}
+{% block content %}
+<h1>Create ticket</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post">
+    <input type="hidden" name="csrf_token" value="{{ current_user['_csrf'] }}">
+    <label>Title <input type="text" name="title" required maxlength="200"></label>
+    <label>Severity
+        <select name="severity">
+            <option value="LOW">LOW</option>
+            <option value="MED">MED</option>
+            <option value="HIGH">HIGH</option>
+        </select>
+    </label>
+    <label>Description <textarea name="description" rows="5" maxlength="5000"></textarea></label>
+    <button type="submit">Create</button>
+</form>
+{% endblock %}
