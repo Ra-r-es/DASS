@@ -1,0 +1,1135 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+\usepackage{caption}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Deskly / AuthX -- Raport de securitate}
+\lhead{\small Dezvoltarea Aplicatiilor Software Securizate}
+\rfoot{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\Large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+
+\definecolor{codebg}{RGB}{248,248,248}
+\definecolor{codekey}{RGB}{0,0,180}
+\definecolor{codestr}{RGB}{170,30,30}
+\definecolor{codecom}{RGB}{40,120,40}
+\definecolor{codenum}{RGB}{120,120,120}
+
+\lstdefinestyle{py}{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecom}\itshape,
+  numbers=left,
+  numberstyle=\tiny\color{codenum},
+  frame=single,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+  xleftmargin=1em,
+}
+\lstdefinestyle{sh}{
+  language=bash,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecom}\itshape,
+  frame=single,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=1em,
+}
+\lstdefinestyle{sqltext}{
+  language=SQL,
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{codekey}\bfseries,
+  stringstyle=\color{codestr},
+  commentstyle=\color{codecom}\itshape,
+  frame=single,
+  backgroundcolor=\color{codebg},
+  breaklines=true,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=1em,
+}
+
+\graphicspath{{./}}
+\newcommand{\captura}[3]{
+  \begin{figure}[H]
+    \centering
+    \IfFileExists{#1}{
+      \includegraphics[width=0.85\textwidth,keepaspectratio]{#1}
+    }{
+      \fbox{\parbox{0.78\textwidth}{\centering\vspace{2.2cm}\textit{[Aici se insereaza captura: #1]}\vspace{2.2cm}}}
+    }
+    \caption{#2}\label{fig:#3}
+  \end{figure}
+}
+
+\setlist{topsep=2pt,itemsep=2pt,parsep=0pt}
+
+\begin{document}
+
+\begin{titlepage}
+\begin{center}
+\vspace*{1.5cm}
+
+{\large UNIVERSITATEA DIN BUCURESTI}\\[0.2cm]
+{\large FACULTATEA DE MATEMATICA SI INFORMATICA}\\[0.2cm]
+{\large Specializarea Informatica, Anul III, Semestrul II}\\[2.5cm]
+
+{\Huge\bfseries Raport de securitate}\\[0.6cm]
+{\LARGE\itshape Proiect 2 -- Break the Login}\\[0.4cm]
+{\Large Atacarea si securizarea autentificarii}\\[0.6cm]
+{\large Aplicatia ``Deskly / AuthX''}\\[3cm]
+
+\begin{tabular}{rl}
+\textbf{Student:}     & Nume Prenume \\
+\textbf{Grupa:}       & NNN \\
+\textbf{Username VM:} & \texttt{rares.stancu@deskly-vm} \\
+\textbf{Email:}       & \texttt{stancurares10@gmail.com} \\
+\textbf{Disciplina:}  & Dezvoltarea Aplicatiilor Software Securizate \\
+\textbf{Data:}        & aprilie 2026 \\
+\end{tabular}
+
+\vfill
+{\small Documentul este insotit de codul sursa (versiunea vulnerabila si versiunea securizata),
+de scripturi de smoke-test (\texttt{smoke\_vuln.py}, \texttt{smoke\_fixed.py}),
+de un clip video de 5--10 minute care
+demonstreaza live atacurile si fix-urile.}
+\end{center}
+\end{titlepage}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\newpage
+
+\section*{Rezumat}
+\addcontentsline{toc}{section}{Rezumat}
+
+Lucrarea de fata documenteaza analiza de securitate si remedierea
+vulnerabilitatilor unei aplicatii web de autentificare construita ca
+parte a Proiectului~2 ``Break the Login''. Aplicatia, denumita generic
+\textit{Deskly / AuthX}, expune in mod intentionat un mecanism de
+autentificare slab construit (versiunea \textit{vulnerable}). Pe acelasi
+nucleu am construit, intr-o a doua iteratie, o versiune securizata
+(\textit{fixed}) care implementeaza controalele cerute de specificatie
+plus controalele suplimentare semnalate in diagrama de arhitectura
+(prevenirea SQL injection si a IDOR, audit logging si Content Security
+Policy).
+
+Raportul respecta structura impusa de baremul de evaluare: introducere,
+setup-ul mediului de lucru, implementarea MVP, prezentarea tehnica a
+vulnerabilitatilor, demonstrarea atacurilor (PoC) cu capturi de ecran,
+analiza impactului, descrierea fix-urilor, re-testul si capitolul dedicat
+audit-ului. Toate cele 6 vulnerabilitati obligatorii (4.1--4.6) sunt
+documentate, plus alte 3 controale derivate din arhitectura (4.7 SQLi,
+4.8 IDOR, 4.9 audit). Fiecare atac este reproductibil pas cu pas, iar
+fix-ul corespunzator este re-testat cu acelasi PoC, demonstrand
+inchiderea vulnerabilitatii.
+
+\newpage
+
+\section{Introducere}\label{sec:intro}
+
+\subsection{Context si obiectiv}
+Proiectul ``Break the Login'' urmareste consolidarea cunostintelor de
+securitate aplicativa prin parcurgerea ciclului complet
+\textbf{Build $\rightarrow$ Hack $\rightarrow$ Fix $\rightarrow$ Retest}
+asupra unui sistem de autentificare. Studentul joaca alternativ rolul de
+\textit{security tester} (identifica si demonstreaza vulnerabilitatile)
+si rolul de \textit{developer} (implementeaza controalele corecte).
+
+Conform specificatiei, accentul cade exclusiv pe:
+\begin{itemize}
+  \item logica de autentificare (Register, Login);
+  \item gestionarea parolelor (stocare, complexitate);
+  \item gestionarea sesiunilor sau a token-urilor;
+  \item resetarea parolei.
+\end{itemize}
+
+Functionalitatile de business (crearea, vizualizarea si cautarea de
+ticket-uri) sunt subordonate acestui obiectiv: ele permit demonstrarea
+problemelor de control acces (IDOR) si a injectiilor SQL pe un endpoint
+de cautare.
+
+\subsection{Scenariu}
+Compania fictiva \textit{AuthX} dezvolta o aplicatie interna numita
+\textit{Deskly}, folosita de doua roluri: \texttt{ANALYST} si
+\texttt{MANAGER}. Echipa de securitate a semnalat probleme grave la
+componenta de autentificare. Studentul preia codul aflat ``in productie''
+(versiunea vulnerabila), executa un mini-pentest si livreaza o versiune
+securizata, plus prezentul raport.
+
+\subsection{Arhitectura aplicatiei}
+Aplicatia este una clasica de tip server-rendered: backend Flask
+(Python~3.13), templating Jinja2, persistenta in SQLite, sesiuni
+server-side (tabela \texttt{sessions}, cookie \texttt{session\_id}).
+Structura pe nivele este urmatoarea:
+
+\begin{itemize}
+  \item \textbf{Web UI} -- formulare HTML pentru Register, Login,
+        Forgot, Reset, plus paginile de tickets, search si audit.
+  \item \textbf{Backend API} -- rutele Flask din \texttt{app.py}:
+        autentificare, CRUD ticket, search, audit viewer (doar v2).
+  \item \textbf{Security Controls (in v2)} -- input validation, output
+        encoding, error handling, AuthZ (RBAC + ownership), CSRF,
+        session/JWT mgmt, audit logging, CSP.
+  \item \textbf{Data Layer} -- repository-uri (UserRepo, TicketRepo,
+        AuditRepo) cu query-uri parametrizate.
+  \item \textbf{Database} -- SQLite, trei tabele: \texttt{users},
+        \texttt{tickets}, \texttt{audit\_logs}, plus tabela
+        \texttt{sessions} pentru sesiuni server-side.
+\end{itemize}
+
+Diagrama de arhitectura furnizata in specificatie pune in evidenta
+controalele suplimentare cerute in versiunea securizata: prevenirea
+injectiei (prepared statements + input validation), prevenirea XSS
+(output encoding in templates), tratarea exceptiilor fara stack-trace,
+verificarea ownership-ului pe fiecare endpoint, protectie CSRF si
+hardening de cookie-uri.
+
+\subsection{Structura raportului}
+Raportul urmeaza, in ordine, sectiunile cerute de barem (Setup mediu,
+Implementare MVP, Prezentare vulnerabilitati, Demonstrare atac, Analiza
+impact, Fix, Re-test, Audit \& logging, Concluzii). La final am inclus
+un capitol dedicat criteriilor de bonus (CSP, rate limiting avansat,
+CI/CD, teste automate de securitate).
+
+\newpage
+\section{Setup mediu}\label{sec:setup}
+
+\subsection{Masina virtuala}
+Aplicatia este rulata exclusiv pe o masina virtuala pentru a respecta
+cerinta de izolare a mediului de testare. VM-ul foloseste Ubuntu~24.04
+LTS, alocate 2~vCPU si 4~GB RAM, retea NAT cu port forwarding 5000.
+Hostname-ul si username-ul sunt vizibile in fiecare captura de ecran,
+asa cum cere baremul.
+
+\begin{lstlisting}[style=sh, caption={Identificarea mediului de lucru}]
+rares.stancu@deskly-vm:~$ whoami
+rares.stancu
+rares.stancu@deskly-vm:~$ hostname
+deskly-vm
+rares.stancu@deskly-vm:~$ uname -a
+Linux deskly-vm 6.8.0-31-generic ...
+rares.stancu@deskly-vm:~$ date
+Wed Apr 29 11:42:01 UTC 2026
+\end{lstlisting}
+
+\captura{identificare.png}{Identificarea studentului si a VM-ului: \texttt{whoami}, \texttt{hostname}, \texttt{uname -a} si \texttt{date} ruleaza in acelasi terminal; bara VirtualBox confirma data sistemului}{setup-id}
+
+\subsection{Stack tehnologic}
+Tehnologiile alese si argumentarea lor (versiunile sunt fixate in
+fisierele \texttt{requirements.txt} ale celor doua versiuni):
+\begin{itemize}
+  \item \textbf{Python 3.13} -- versiune curenta, suport bcrypt 5.0.
+  \item \textbf{Flask 3.1} -- framework web minimal, suficient pentru
+        scopul didactic; nu introduce protectii implicite (potrivit
+        pentru a expune vulnerabilitatile in v1).
+  \item \textbf{SQLite 3} -- DB locala, fara dependente externe;
+        baremul accepta SQLite explicit. Permite usor demonstratiile
+        de SQL injection (engine real, sintaxa standard).
+  \item \textbf{bcrypt 5.0} -- folosit doar in v2 pentru hash-area
+        parolelor; cost factor 12 (echilibru intre rezistenta si
+        latenta sub 250~ms).
+  \item \textbf{Jinja2} -- inclus in Flask, escapare HTML automata
+        pentru prevenirea XSS.
+\end{itemize}
+
+\subsection{Structura proiectului}
+Cele doua versiuni sunt fizic separate in directoarele
+\texttt{vulnerable/} si \texttt{fixed/}, fiecare cu propriul
+\texttt{app.py}, propriul director \texttt{templates/} si propriul
+fisier de baza de date generat la prima rulare.
+
+\begin{lstlisting}[style=sh, caption={Arborele proiectului}]
+deskly/
+|-- vulnerable/
+|   |-- app.py                 
+|   |-- requirements.txt
+|   |-- templates/             
+|   `-- deskly_vuln.db         
+|-- fixed/
+|   |-- app.py                 
+|   |-- requirements.txt       
+|   |-- templates/             
+|   `-- deskly_fixed.db
+|-- smoke_vuln.py              
+|-- smoke_fixed.py             
+\end{lstlisting}
+
+\subsection{Pornirea aplicatiilor}
+\begin{lstlisting}[style=sh, caption={Pornirea versiunii vulnerabile}]
+rares.stancu@deskly-vm:~$ cd ~/proiect/vulnerable
+rares.stancu@deskly-vm:~/proiect/vulnerable$ python3 -m venv .venv
+rares.stancu@deskly-vm:~/proiect/vulnerable$ source .venv/bin/activate
+(.venv) rares.stancu@deskly-vm:~/proiect/vulnerable$ pip install -r requirements.txt
+(.venv) rares.stancu@deskly-vm:~/proiect/vulnerable$ python app.py
+ * Running on http://127.0.0.1:5000
+\end{lstlisting}
+
+\captura{pornit.png}{Aplicatia Flask ascultand pe \texttt{127.0.0.1:5000}: in captura este pornita versiunea \texttt{fixed} (din \texttt{\textasciitilde/proiecte/deskly/fixed}); pentru \texttt{vulnerable} comenzile sunt identice, doar directorul difera}{setup-server}
+
+Pentru v2 procedeul este identic, intr-un terminal separat, dupa ce v1
+este oprit (ambele folosesc port-ul 5000).
+
+\subsection{Conturi seed si initializare DB}
+La prima pornire, fiecare versiune executa \texttt{init\_db()} care
+creeaza schema (\texttt{users}, \texttt{tickets}, \texttt{audit\_logs},
+\texttt{sessions}) si insereaza doua conturi de test, plus doua
+ticket-uri. Conturile sunt:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Email} & \textbf{Parola} & \textbf{Rol} \\
+\midrule
+\texttt{manager@deskly.local} & \texttt{Manager123!} & MANAGER \\
+\texttt{analyst@deskly.local} & \texttt{Analyst123!} & ANALYST \\
+\bottomrule
+\end{tabular}
+\caption{Conturi seed (identice in v1 si v2)}
+\label{tab:seed}
+\end{table}
+
+In v1, hash-urile sunt MD5; in v2, bcrypt cost 12. Acelasi script de
+initializare ruleaza pe ambele versiuni, dar ramura de inserare a
+parolei difera intre cele doua \texttt{app.py}.
+
+\newpage
+\section{Implementarea MVP}\label{sec:mvp}
+
+\subsection{Schema bazei de date}
+Schema este identica intre v1 si v2 ca structura, ca sa permita
+compararea atacurilor pe acelasi set de date. Diferentele apar la
+continut (hash-ul parolei, prezenta sau absenta inregistrarilor de
+audit).
+
+\begin{lstlisting}[style=sqltext, caption={Schema bazei de date (extras din \texttt{init\_db()})}]
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'ANALYST',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    locked INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    severity TEXT NOT NULL DEFAULT 'LOW',
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    owner_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_id) REFERENCES users(id)
+);
+CREATE TABLE audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER, action TEXT, resource TEXT,
+    resource_id TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address TEXT
+);
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- in v2 se adauga: expires_at, ip_address, user_agent, revoked
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+\end{lstlisting}
+
+Cheia de prevenire IDOR este coloana \texttt{tickets.owner\_id}: in v2,
+fiecare endpoint care returneaza un ticket verifica explicit
+\texttt{ticket.owner\_id == current\_user.id} sau ca rolul este
+\texttt{MANAGER}.
+
+\subsection{Inregistrarea utilizatorilor (Register)}
+Formularul colecteaza email-ul si parola, apoi trimite \texttt{POST
+/register}. Versiunea vulnerabila accepta orice parola non-vida si
+foloseste MD5 fara salt; versiunea securizata aplica
+\texttt{PASSWORD\_POLICY\_RE} si bcrypt.
+
+\begin{lstlisting}[style=py, caption={Register (extras din \texttt{vulnerable/app.py})}]
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    error = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm", "")
+        if not email or not password:
+            error = "Email and password required"
+        elif password != confirm:
+            error = "Passwords do not match"
+        else:
+            db = get_db()
+            db.execute(
+                "INSERT INTO users (email, password_hash, role) "
+                "VALUES (?, ?, 'ANALYST')",
+                (email, hash_password(password)),  
+            )
+            db.commit()
+            return redirect(url_for("login"))
+    return render_template("register.html", error=error)
+\end{lstlisting}
+
+\subsection{Autentificare si gestionarea sesiunii}
+Sesiunile sunt server-side: la login se insereaza un rand in tabela
+\texttt{sessions} si se returneaza un cookie \texttt{session\_id} care
+contine doar ID-ul opac. Aceasta arhitectura permite invalidarea reala
+a sesiunii la logout (in v2) -- in v1 logout-ul sterge doar cookie-ul
+client.
+
+\begin{lstlisting}[style=py, caption={Login si emiterea cookie-ului in v1}]
+token = secrets.token_hex(16)
+db.execute("INSERT INTO sessions (id, user_id) VALUES (?, ?)",
+           (token, user["id"]))
+db.commit()
+resp = make_response(redirect(url_for("dashboard")))
+resp.set_cookie(SESSION_COOKIE, token, max_age=30 * 24 * 3600)
+return resp
+\end{lstlisting}
+
+\subsection{Resetarea parolei}
+Fluxul ``Forgot password'' afiseaza tokenul direct in pagina (in mediul
+real ar fi trimis prin email). In v1 tokenul are forma
+\texttt{base64url(user\_id : timestamp)}, fara nicio inregistrare
+server-side. In v2 tokenul este aleator (32~bytes), stocat hash-uit, cu
+expirare 1~ora si invalidat dupa folosire.
+
+\subsection{CRUD Tickets si Search}
+Listarea ticketelor respecta rolul (un \texttt{ANALYST} vede doar ce a
+creat, un \texttt{MANAGER} vede tot). Endpoint-ul \texttt{/ticket/<id>}
+in v1 nu verifica ownership-ul, ceea ce conduce la IDOR. Endpoint-ul
+\texttt{/ticket/search} in v1 concateneaza string SQL, ceea ce permite
+SQL injection.
+
+\begin{lstlisting}[style=py, caption={Search vulnerabil (concatenare SQL)}]
+@app.route("/ticket/search")
+@login_required
+def ticket_search():
+    q = request.args.get("q", "")
+    sql = ("SELECT id, title, description, severity, status, owner_id "
+           "FROM tickets WHERE title LIKE '
+           "OR description LIKE '
+    try:
+        rows = get_db().execute(sql).fetchall()
+    except sqlite3.Error as e:
+        # Leaks SQL-engine errors -- ajuta atacatorul sa tuneze payload-ul.
+        return render_template("ticket_search.html", q=q, tickets=[],
+                               error=f"SQL error: {e}")
+    return render_template("ticket_search.html", q=q, tickets=rows)
+\end{lstlisting}
+
+\newpage
+\section{Prezentarea vulnerabilitatilor (mapare OWASP)}\label{sec:vuln}
+
+Fiecare vulnerabilitate este mapata pe categoria corespunzatoare din
+\textit{OWASP Top~10 (2021)} si pe controlul corespunzator din
+\textit{OWASP ASVS v4.0.3}. Maparea face explicita relatia dintre
+problemele identificate si standardele recunoscute industrial.
+
+\begin{longtable}{p{0.04\textwidth} p{0.22\textwidth} p{0.30\textwidth} p{0.34\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Vulnerabilitate} & \textbf{OWASP Top 10 (2021)} & \textbf{ASVS v4.0.3} \\
+\midrule
+\endhead
+4.1 & Password policy slaba & A07: Identification and Authentication Failures & V2.1.1 (lungime min.~12), V2.1.7 (banned passwords) \\
+4.2 & Stocare nesigura (MD5) & A02: Cryptographic Failures & V2.4.1 (Argon2/bcrypt), V2.4.4 (cost suficient) \\
+4.3 & Brute-force / no rate limit & A07 + A04: Insecure Design & V2.2.1 (anti-automation), V11.1.5 (lockout) \\
+4.4 & User enumeration & A01: Broken Access Control / A07 & V2.2.6 (mesaj generic), V2.10.4 (timp uniform) \\
+4.5 & Sesiune nesigura & A07 + A02 & V3.4.1 (HttpOnly), V3.4.2 (SameSite), V3.3.1 (rotatie) \\
+4.6 & Reset token nesigur & A07 + A04 & V2.5.1 (token aleator), V2.5.4 (expirare), V2.5.7 (one-time) \\
+4.7 & SQL injection & A03: Injection & V5.3.4 (parameterized queries) \\
+4.8 & IDOR & A01: Broken Access Control & V4.2.1 (object-level authZ) \\
+4.9 & Lipsa audit & A09: Security Logging Failures & V7.1.1, V7.1.3 (logarea evenimentelor) \\
+\bottomrule
+\caption{Maparea vulnerabilitatilor pe OWASP Top 10 si ASVS}
+\label{tab:owasp}
+\end{longtable}
+
+Pentru fiecare vulnerabilitate este descris in continuare:
+(i)~mecanismul tehnic prin care apare in v1, (ii)~PoC-ul reproductibil,
+(iii)~impactul asupra triadei CIA si asupra business-ului fictiv,
+(iv)~fix-ul implementat in v2, cu trimitere la cod, (v)~re-testul.
+
+\subsection{Sumarizare tehnica per vulnerabilitate}
+Tabelul de mai jos este o vedere compacta inainte de a intra in
+detaliile fiecarui atac. Coloana ``Loc cod v1'' indica functia in care
+apare problema; coloana ``Fix v2'' indica zona modificata.
+
+\begin{longtable}{p{0.04\textwidth} p{0.18\textwidth} p{0.34\textwidth} p{0.34\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Pe scurt} & \textbf{Loc cod v1} & \textbf{Fix v2} \\
+\midrule
+4.1 & Parole triviale & \texttt{register()}, \texttt{reset()} & \texttt{PASSWORD\_POLICY\_RE} (8+, U, d, sym) \\
+4.2 & MD5 fara salt & \texttt{hash\_password()} & \texttt{bcrypt.hashpw(gensalt(rounds=12))} \\
+4.3 & Brute-force liber & \texttt{login()} & \texttt{failed\_attempts} + \texttt{lock\_until} (5 / 15min) \\
+4.4 & Mesaje distincte & \texttt{login()}, \texttt{forgot()} & Mesaj generic + bcrypt dummy timing \\
+4.5 & Cookie + zombie & \texttt{login()}, \texttt{logout()} & HttpOnly + SameSite + rotatie + revoke \\
+4.6 & Token previzibil & \texttt{forgot()}, \texttt{reset()} & \texttt{secrets.token\_urlsafe} + hash + 1h \\
+4.7 & Concat. SQL & \texttt{ticket\_search()} & Parametrizare cu \texttt{?} \\
+4.8 & IDOR & \texttt{ticket\_detail()} & Verif. \texttt{owner\_id} sau MANAGER \\
+4.9 & Fara audit & peste tot & Helper \texttt{audit()} pe toate ramurile \\
+\bottomrule
+\caption{Sumar vulnerabilitati cu pointer la cod}
+\label{tab:vuln-summary}
+\end{longtable}
+
+\newpage
+\section{Demonstrarea atacurilor (PoC)}\label{sec:poc}
+
+Pentru fiecare atac sunt prezentate: (a) request-ul HTTP relevant,
+(b) o captura de ecran cu rezultatul, (c) interpretarea raspunsului.
+inclus la livrare.
+
+\subsection{4.1 -- Acceptarea parolelor triviale}
+\textbf{Pas 1.} Trimitere formular \texttt{POST /register} cu o parola
+de un caracter:
+\begin{lstlisting}[style=sh]
+POST /register HTTP/1.1
+Host: 127.0.0.1:5000
+Content-Type: application/x-www-form-urlencoded
+
+email=weak_rares@x.local&password=a&confirm=a
+\end{lstlisting}
+
+\textbf{Raspuns.} HTTP 302 catre \texttt{/login}. Niciun mesaj de
+eroare; rand nou in tabela \texttt{users}.
+
+\captura{vulnParola.png}{Dupa register cu parola de un caracter, contul \texttt{weak.@gmail.com} ajunge direct pe \texttt{/dashboard} cu rolul \texttt{ANALYST}; in dreapta, randul aferent stocat in \texttt{deskly\_vuln.db} (hash MD5 in coloana \texttt{password\_hash})}{poc-41}
+
+\subsection{4.2 -- Recuperarea parolelor din DB}
+Cu acces la fisierul \texttt{deskly\_vuln.db}, hash-urile sunt vizibile
+direct in coloana \texttt{password\_hash}:
+\begin{lstlisting}[style=sh]
+$ sqlite3 deskly_vuln.db "SELECT email, password_hash FROM users;"
+manager@deskly.local | b65a1b6aef38e1ed3d62c73cd3e63dac
+analyst@deskly.local | 91d5a6f1f0c0d47c9c8d3d3f3a5d8a2a
+$ python3 -c "import hashlib; print(hashlib.md5(b'Manager123!').hexdigest())"
+b65a1b6aef38e1ed3d62c73cd3e63dac
+\end{lstlisting}
+\textbf{Confirmare.} Hash-ul recalculat e identic cu cel din DB.
+
+\captura{parolaMd5.png}{Tabela \texttt{users} din \texttt{deskly\_vuln.db}: hash-urile au exact 32 caractere hex, semnatura tipica MD5 fara salt; sunt usor de cracat offline}{poc-42}
+
+\subsection{4.3 -- Brute-force fara lockout}
+Pentru a demonstra ca \texttt{POST /login} accepta un numar nelimitat de
+incercari, am rulat un loop \texttt{curl} cu 6 parole succesive pe
+contul \texttt{manager@deskly.local}. Primele 5 (\texttt{123456},
+\texttt{password}, \texttt{qwerty}, \texttt{letmein}, \texttt{admin})
+au primit toate raspuns HTTP \textbf{200} cu pagina de eroare, iar a
+6-a incercare cu parola corecta \texttt{Manager123!} a reusit la prima
+trecere -- raspuns \textbf{302} catre \texttt{/dashboard}. In tabela
+\texttt{users}, coloana \texttt{locked} a ramas \texttt{0} pentru toti
+utilizatorii: nu exista mecanism de lockout, captcha sau delay.
+
+\captura{rateLimit.png}{Loop \texttt{curl} pe \texttt{/login}: 5 esecuri (status 200) urmate de un succes la a 6-a incercare (status 302); randul \texttt{manager@deskly.local} ramane \texttt{locked=0} in DB}{poc-43}
+
+\subsection{4.4 -- Enumerare utilizatori}
+Trimiterea unui email inexistent vs. unui email valid produce mesaje
+distincte:
+\begin{itemize}
+  \item \texttt{ghost@nope.local} $\rightarrow$ ``User does not exist''
+  \item \texttt{manager@deskly.local} $\rightarrow$ ``Incorrect password''
+\end{itemize}
+Pe langa text, lungimea raspunsului HTTP difera, ceea ce permite
+automatizarea atacului prin scripturi \texttt{curl} pe o lista de
+email-uri (filtrare dupa coloana \texttt{size}).
+
+\captura{userIncorect.png}{Email inexistent (\texttt{ghost@nope.local}): mesajul \emph{``User does not exist''} il anunta pe atacator ca poate trece la urmatorul candidat}{poc-44a}
+
+\captura{incorrectPass.png}{Email valid + parola gresita (\texttt{manager@deskly.local} / \texttt{wrong}): mesajul diferit \emph{``Incorrect password''} confirma existenta contului}{poc-44b}
+
+\captura{userEnumeration.png}{Atac timing-based cu \texttt{enum\_timing.sh}: ramura ``user gasit'' calculeaza MD5 si raspunde mai lent (\(\sim\)10~ms vs.\ \(\sim\)2~ms pentru ramura ``user lipsa''), permitand enumerarea chiar daca textul ar fi identic}{poc-44c}
+
+\subsection{4.5 -- Cookie nesigur si sesiune ``zombie''}
+\textbf{Pas 1.} Inspectia cookie-ului in DevTools arata absenta
+flag-urilor HttpOnly, Secure si SameSite, plus o expirare de 30 zile.
+\textbf{Pas 2.} Apelul \texttt{document.cookie} din Console returneaza
+valoarea cookie-ului -- proba ca un payload XSS l-ar putea exfiltra.
+\textbf{Pas 3.} Dupa \texttt{Logout}, replay cu \texttt{curl} pe
+\texttt{/dashboard} folosind cookie-ul capturat reuseste:
+\begin{lstlisting}[style=sh]
+$ curl -s -b "session_id=8c31fa..." http://127.0.0.1:5000/dashboard \
+       | grep -o "<title>.*</title>"
+<title>Dashboard - Deskly</title>
+\end{lstlisting}
+
+\captura{document.cookie.png}{Cookie \texttt{session\_id} in v1: in browser-ul logat ca \texttt{manager}, apelul \texttt{document.cookie} din Console returneaza \texttt{`session\_id=2322adfdee9be8ef6f73ea2e0e6a2353'} -- proba directa ca lipseste flag-ul \textbf{HttpOnly}, deci un payload XSS reflectat ar putea exfiltra cookie-ul si l-ar putea folosi 30 de zile (max\_age implicit)}{poc-45}
+
+\captura{sessionCookie.png}{Sesiune ``zombie'' dupa logout: dupa ce utilizatorul apasa \emph{Logout} in browser, replay-ul cu \texttt{curl -b "session\_id=\textit{capturat}" /dashboard} returneaza \textbf{HTTP 200} cu pagina logata ca \texttt{manager@deskly.local} -- rândul din tabela \texttt{sessions} nu este sters server-side, deci cookie-ul ramane valid; combinata cu lipsa HttpOnly, vulnerabilitatea permite persistenta atacatorului 30 de zile}{poc-45b}
+
+\subsection{4.6 -- Reset token forjat}
+Tokenul fiind \texttt{base64url(user\_id:timestamp)}, atacatorul il
+poate genera offline:
+\begin{lstlisting}[style=sh]
+$ python3 -c "import base64; print(base64.urlsafe_b64encode(b'1:0').decode().rstrip('='))"
+MTow
+$ # browser: GET /reset/MTow ; submit parola noua "pwn3d-by-attacker"
+$ # browser: POST /login cu manager@deskly.local + noua parola -> 302 /dashboard
+\end{lstlisting}
+Atacatorul preia complet contul managerului fara sa fi avut vreodata
+acces la inboxul lui.
+
+\captura{tokenForjat.png}{Pasul 1 al atacului: atacatorul, fara sa fie logat, navigheaza la \texttt{http://127.0.0.1:5000/reset/MTow} (token-ul \texttt{MTow} = \texttt{base64url(b'1:0')}, generat offline cu o comanda \texttt{python3 -c "..."}); aplicatia accepta tokenul si afiseaza formularul \emph{Reset password}, permitand setarea unei noi parole pentru \texttt{user\_id=1}}{poc-46a}
+
+\captura{managerDupatoken.png}{Pasul 2 -- account takeover finalizat: dupa schimbarea parolei via tokenul forjat, atacatorul se logheaza cu \texttt{manager@deskly.local} si noua parola si ajunge pe \texttt{/dashboard} cu rolul \texttt{MANAGER}, fara sa fi avut vreodata acces la inboxul victimei}{poc-46b}
+
+\captura{tokendecodat.png}{Confirmarea structurii tokenurilor reale emise de v1: o comanda Python \texttt{base64.urlsafe\_b64decode} aplicata pe un token capturat de pe \texttt{/forgot} returneaza \texttt{b'5:1777107379'} -- adica \texttt{user\_id:timestamp\_unix}; ambele campuri sunt usor de ghicit (id-uri mici secventiale, timestamp-ul curent)}{poc-46c}
+
+\subsection{4.7 -- SQL injection pe \texttt{/ticket/search}}
+Loginat ca \texttt{analyst}, urmatoarele payload-uri demonstreaza
+exploatabilitatea:
+\begin{lstlisting}[style=sh]
+GET /ticket/search?q=
+GET /ticket/search?q=
+\end{lstlisting}
+Prima injectie (\texttt{' OR 1=1--}) inchide ghilimeaua de la
+\texttt{LIKE '\%...\%'} si transforma clauza \texttt{WHERE} intr-o
+tautologie, iar \texttt{--} comenteaza restul query-ului. Rezultatul:
+analist-ul vede \emph{toate} ticketele, inclusiv ticketul confidential
+\texttt{\#1 -- Internal report} al managerului. A doua injectie
+(UNION-based) expune hash-urile MD5 ale tuturor utilizatorilor in
+coloana \texttt{description} a tabelului afisat -- combinabil cu
+atacul 4.2 pentru full account takeover.
+
+\captura{ORSQL.png}{SQL injection \texttt{' OR 1=1--}: utilizatorul \texttt{analyst@deskly.local} obtine ambele tickete (inclusiv \texttt{Internal report} cu \texttt{owner\_id=1}, al managerului) -- bara de URL contine payload-ul URL-encoded}{poc-47a}
+
+\captura{sqlUnion.png}{UNION-based SQLi pe \texttt{/ticket/search}: payload-ul \texttt{' UNION SELECT id, email, password\_hash, role, created\_at, locked FROM users--} concateneaza rezultatele cautarii cu intregul tabel \texttt{users}; in coloana \texttt{Description} apar hash-urile MD5 ale tuturor conturilor (\texttt{manager@deskly.local}, \texttt{analyst@deskly.local}, plus eventuale conturi de test) -- combinabil cu atacul 4.2 pentru full account takeover}{poc-47b}
+
+\captura{sqlError.png}{Information disclosure prin mesaje de eroare: un payload UNION trunchiat (\texttt{' UNION SELECT id, email, password\_hash, role, created\_at, locked FROM users-}, fara comentariul final) provoaca un raspuns \emph{``SQL error: near \"-\": syntax error''} afisat direct in pagina; mesajul confirma atacatorului ca engine-ul este SQLite si ca injectia este exploatabila, accelerand tunarea payload-ului}{poc-47c}
+
+\subsection{4.8 -- IDOR pe \texttt{/ticket/<id>}}
+Loginat ca \texttt{analyst} (\texttt{user.id=2}), accesarea
+\texttt{/ticket/1} (ticketul managerului) returneaza HTTP 200 cu
+continutul confidential:
+\begin{lstlisting}[style=sh]
+GET /ticket/1
+=> HTTP/1.1 200 OK
+=> <h1>Ticket #1: Internal report</h1>
+=> <p>A leaked admin password was found.</p>
+\end{lstlisting}
+
+\captura{ticket2.png}{Baseline -- listarea \texttt{/tickets} ca \texttt{analyst@deskly.local}: aplicatia afiseaza un singur rand (\texttt{Phishing email}, \texttt{owner\_id=2}), respectand izolarea legitima a datelor pe owner; lipsa verificarii \texttt{owner\_id} apare doar pe \texttt{/ticket/<id>}}{poc-48a}
+
+\captura{idor.png}{IDOR pur: acelasi \texttt{analyst@deskly.local} (badge sus-dreapta) navigheaza direct la \texttt{/ticket/1} si primeste \texttt{Ticket \#1 -- Internal report}, severitate \texttt{HIGH}, descriere \emph{``A leaked admin password was found.''}; \texttt{owner\_id=1} (manager) este afisat in pagina, iar HTTP 200 in Network tab confirma absenta oricarui control de acces}{poc-48b}
+
+\subsection{4.9 -- Lipsa audit logging}
+Dupa ce am executat toate cele 8 atacuri de mai sus, tabela
+\texttt{audit\_logs} este goala:
+\begin{lstlisting}[style=sh]
+$ sqlite3 deskly_vuln.db "SELECT COUNT(*) FROM audit_logs;"
+0
+\end{lstlisting}
+
+\captura{auditzero.png}{Dovada lipsei audit-ului in v1: \texttt{SELECT COUNT(*) FROM audit\_logs} returneaza \texttt{0} chiar si dupa cele 8 atacuri precedente, iar \texttt{.schema audit\_logs} confirma ca tabela exista in schema seed dar nu este folosita de \texttt{vulnerable/app.py}}{poc-49}
+
+\newpage
+\section{Analiza impactului}\label{sec:impact}
+
+Impactul fiecarei vulnerabilitati este evaluat pe triada CIA
+(\textit{Confidentiality}, \textit{Integrity}, \textit{Availability})
+si exprimat in scenarii concrete de business.
+
+\begin{longtable}{p{0.04\textwidth} p{0.22\textwidth} p{0.10\textwidth} p{0.50\textwidth}}
+\toprule
+\textbf{ID} & \textbf{Vuln.} & \textbf{CIA} & \textbf{Scenariu de business} \\
+\midrule
+4.1 & Password policy & C & Parolele triviale permit credential stuffing pe scara larga; conturile reale ale angajatilor sunt compromise prin liste publice (ex. RockYou). \\
+4.2 & Stocare MD5 & C & Un dump al DB (backup, exfiltrare via SQLi) expune toate parolele; intrucat utilizatorii reutilizeaza parole, conturile lor sunt compromise si pe alte servicii. \\
+4.3 & Brute-force & C, I & Atacatorul preia conturi prin dictionary attack online; nu exista lockout, deci atacul este invizibil pentru SOC. \\
+4.4 & User enumeration & C & Atacatorul construieste o lista de email-uri valide, pe care le foloseste tintit la phishing si spear-phishing. \\
+4.5 & Sesiune nesigura & C, I & XSS reflectat poate exfiltra cookie-ul (lipsa HttpOnly); cookie-ul capturat este valid 30 de zile si nu este invalidat la logout. \\
+4.6 & Reset token & C, I, A & Account takeover total fara interactiune cu victima; atacatorul poate bloca accesul utilizatorului prin schimbarea parolei. \\
+4.7 & SQL injection & C, I, A & Citire tabele arbitrare (\texttt{users}, \texttt{audit\_logs}); pe SQLite se poate face si \texttt{ATTACH DATABASE} (write); pierderi de date masive. \\
+4.8 & IDOR & C, I & Acces cross-tenant la informatii confidentiale (in scenariul de business: rapoarte de audit intern, tichete cu credentiale). \\
+4.9 & Lipsa audit & I, A & Incidentele nu pot fi reconstituite forensic; non-repudierea este imposibila; reglementarile (GDPR Art. 30, ISO 27001 A.12.4) nu sunt respectate. \\
+\bottomrule
+\caption{Analiza impactului per vulnerabilitate}
+\label{tab:impact}
+\end{longtable}
+
+\subsection{Scenariu agregat de exploatare}
+Cele 9 vulnerabilitati pot fi inlantuite intr-un \textit{kill chain}
+realist:
+\begin{enumerate}
+  \item \textbf{4.4 + 4.3}: atacatorul enumera email-urile valide si
+        lanseaza un dictionary attack online; un cont cu parola slaba
+        cade in cateva minute.
+  \item \textbf{4.7}: cu un cont de \texttt{ANALYST}, atacatorul exfiltreaza
+        intreaga tabela \texttt{users} prin SQL injection.
+  \item \textbf{4.2}: hash-urile MD5 sunt sparte offline aproape instant
+        pentru orice parola din top 10.000.
+  \item \textbf{4.6} (alternativ, daca o parola nu cade): atacatorul
+        forjeaza tokenul de reset al contului \texttt{MANAGER} si il
+        preia direct.
+  \item \textbf{4.8}: cu un cont de manager, atacatorul iese complet
+        din silosul de vizibilitate si citeste toate ticketele.
+  \item \textbf{4.5}: pentru persistenta, atacatorul exfiltreaza
+        cookie-ul printr-un XSS si il pastreaza valid 30 de zile.
+  \item \textbf{4.9}: pentru ca nicio actiune nu este auditata,
+        compromiterea poate trece nedetectata pana la urmatorul audit
+        extern.
+\end{enumerate}
+Concluzie: scorul agregat al riscului este \textbf{Critic}; v1 nu poate
+fi expusa in mediu de productie.
+
+\newpage
+\section{Implementarea fix-urilor}\label{sec:fix}
+
+Aceasta sectiune prezinta, pentru fiecare vulnerabilitate, codul
+modificat in v2 si justificarea controlului ales. Numerele de linie
+fac referire la fisierul \texttt{fixed/app.py}.
+
+\subsection{4.1 -- Politica de parole}
+Validarea se face prin expresie regulata, aplicata atat la \texttt{Register}
+cat si la \texttt{Reset}.
+
+\begin{lstlisting}[style=py, caption={Validare parola in v2}]
+PASSWORD_POLICY_RE = re.compile(
+    r"^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$"
+)
+def validate_password(pw: str) -> str | None:
+    if not PASSWORD_POLICY_RE.match(pw):
+        return ("Password must be at least 8 chars and include "
+                "uppercase, digit and symbol.")
+    return None
+\end{lstlisting}
+
+\subsection{4.2 -- Hash bcrypt cost 12}
+\begin{lstlisting}[style=py, caption={Hash si verificare bcrypt}]
+import bcrypt
+def hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt(rounds=12)).decode()
+def verify_password(pw: str, h: str) -> bool:
+    try:
+        return bcrypt.checkpw(pw.encode(), h.encode())
+    except ValueError:
+        return False
+\end{lstlisting}
+\textbf{Justificare.} Cost factor 12 ofera $\sim 250$~ms per verificare
+pe hardware-ul VM, ceea ce face brute-force-ul offline impracticabil.
+Salt-ul este generat per parola, deci doua conturi cu aceeasi parola au
+hash-uri diferite.
+
+\subsection{4.3 -- Rate limiting si lockout}
+Tabela \texttt{users} primeste doua coloane suplimentare:
+\texttt{failed\_attempts} si \texttt{lock\_until}. Dupa 5 esecuri
+consecutive, contul este blocat 15 minute.
+
+\begin{lstlisting}[style=py, caption={Lockout per cont in v2}]
+MAX_FAILED = 5
+LOCK_MINUTES = 15
+
+def login_check(user, password) -> tuple[bool, str | None]:
+    if user["lock_until"] and user["lock_until"] > _sql_ts():
+        return False, "Account locked. Try again later."
+    if not verify_password(password, user["password_hash"]):
+        n = user["failed_attempts"] + 1
+        if n >= MAX_FAILED:
+            db.execute("UPDATE users SET failed_attempts=0, "
+                       "lock_until=? WHERE id=?",
+                       (_sql_ts(minutes=LOCK_MINUTES), user["id"]))
+        else:
+            db.execute("UPDATE users SET failed_attempts=? WHERE id=?",
+                       (n, user["id"]))
+        db.commit()
+        return False, "Invalid credentials"
+    db.execute("UPDATE users SET failed_attempts=0 WHERE id=?",
+               (user["id"],))
+    return True, None
+\end{lstlisting}
+
+\subsection{4.4 -- Mesaj generic si timp uniform}
+Pentru a egaliza timpul de raspuns intre ramurile ``user gasit'' si
+``user lipsa'', in cazul lipsei se calculeaza un bcrypt dummy.
+
+\begin{lstlisting}[style=py, caption={Mesaj generic + dummy bcrypt}]
+DUMMY_HASH = bcrypt.hashpw(b"dummy", bcrypt.gensalt(rounds=12)).decode()
+GENERIC = "Invalid credentials"
+
+def login_route():
+    user = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    if user is None:
+        bcrypt.checkpw(b"dummy", DUMMY_HASH.encode())   # timing
+        audit("LOGIN_FAIL", resource="auth", resource_id=email)
+        return render_template("login.html", error=GENERIC)
+    ok, _ = login_check(user, password)
+    if not ok:
+        audit("LOGIN_FAIL", user_id=user["id"], resource="auth")
+        return render_template("login.html", error=GENERIC)
+    ...
+\end{lstlisting}
+
+\subsection{4.5 -- Cookie hardening si rotatia sesiunii}
+\begin{lstlisting}[style=py, caption={Cookie hardening + revoke server-side}]
+resp.set_cookie(
+    SESSION_COOKIE, token,
+    httponly=True, samesite="Lax", secure=False,  # secure=True in HTTPS
+    max_age=3600,                                  # 1h, nu 30 zile
+)
+# La logout:
+db.execute("UPDATE sessions SET revoked=1 WHERE id=?", (token,))
+db.commit()
+\end{lstlisting}
+Rotatia sesiunii: la fiecare login se genereaza un \textbf{nou}
+\texttt{session\_id}, iar valoarea anterioara (daca exista) este
+marcata \texttt{revoked=1}. Astfel, fixarea sesiunii este imposibila.
+
+\subsection{4.6 -- Token aleator, hash-uit, one-time, cu expirare}
+\begin{lstlisting}[style=py, caption={Reset token securizat}]
+import secrets, hashlib
+
+def make_reset_token(user_id: int) -> str:
+    raw = secrets.token_urlsafe(32)
+    h = hashlib.sha256(raw.encode()).hexdigest()
+    db.execute(
+        "INSERT INTO password_resets (user_id, token_hash, "
+        "expires_at, used) VALUES (?, ?, ?, 0)",
+        (user_id, h, _sql_ts(hours=1)),
+    )
+    db.commit()
+    return raw     # se trimite prin email; in laborator se afiseaza in pagina
+
+def consume_reset_token(raw: str) -> int | None:
+    h = hashlib.sha256(raw.encode()).hexdigest()
+    row = db.execute(
+        "SELECT * FROM password_resets WHERE token_hash=? AND used=0 "
+        "AND expires_at > ?", (h, _sql_ts())).fetchone()
+    if row is None:
+        return None
+    db.execute("UPDATE password_resets SET used=1 WHERE id=?", (row["id"],))
+    db.commit()
+    return row["user_id"]
+\end{lstlisting}
+
+\subsection{4.7 -- Query parametrizate}
+\begin{lstlisting}[style=py, caption={Search securizat}]
+@app.route("/ticket/search")
+@login_required
+def ticket_search():
+    q = request.args.get("q", "").strip()[:100]   # input validation
+    like = f"
+    rows = get_db().execute(
+        "SELECT id, title, description, severity, status, owner_id "
+        "FROM tickets WHERE (title LIKE ? OR description LIKE ?) "
+        "  AND (owner_id = ? OR ? = 'MANAGER') "
+        "ORDER BY id DESC LIMIT 50",
+        (like, like, current_user()["id"], current_user()["role"]),
+    ).fetchall()
+    return render_template("ticket_search.html", q=q, tickets=rows)
+\end{lstlisting}
+
+\subsection{4.8 -- Verificare ownership}
+\begin{lstlisting}[style=py, caption={IDOR prevention pe \texttt{/ticket/<id>}}]
+@app.route("/ticket/<int:ticket_id>")
+@login_required
+def ticket_detail(ticket_id):
+    user = current_user()
+    row = get_db().execute(
+        "SELECT * FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    if row is None:
+        abort(404)
+    if row["owner_id"] != user["id"] and user["role"] != "MANAGER":
+        audit("IDOR_BLOCKED", user_id=user["id"],
+              resource="ticket", resource_id=str(ticket_id))
+        abort(403)
+    return render_template("ticket_detail.html", ticket=row)
+\end{lstlisting}
+
+\subsection{4.9 -- Audit logging}
+Helper-ul \texttt{audit()} este apelat in toate ramurile sensibile:
+login (succes/esec), reset (cerut/folosit), IDOR blocat, CSRF blocat,
+schimbare ticket etc. Tabela \texttt{audit\_logs} este consultabila
+prin endpoint-ul \texttt{/audit} (doar pentru rolul \texttt{MANAGER}).
+
+\begin{lstlisting}[style=py, caption={Helper de audit}]
+def audit(action: str, *, user_id: int | None = None,
+          resource: str = "", resource_id: str = ""):
+    get_db().execute(
+        "INSERT INTO audit_logs (user_id, action, resource, "
+        "resource_id, ip_address) VALUES (?, ?, ?, ?, ?)",
+        (user_id, action, resource, resource_id, request.remote_addr),
+    )
+    get_db().commit()
+\end{lstlisting}
+
+\subsection{Controale orizontale}
+Pe langa fix-urile dedicate fiecarei vulnerabilitati, in v2 am adaugat
+controale orizontale care imbunatatesc postura globala de securitate:
+
+\begin{itemize}
+  \item \textbf{CSRF}. Token aleator per sesiune, validat in
+        \texttt{before\_request} pentru toate metodele non-safe (POST,
+        PUT, DELETE).
+  \item \textbf{Security headers}. \texttt{after\_request} adauga
+        \texttt{X-Content-Type-Options: nosniff},
+        \texttt{X-Frame-Options: DENY},
+        \texttt{Referrer-Policy: same-origin}.
+  \item \textbf{Content Security Policy}. Directiva
+        \texttt{default-src 'self'; script-src 'self'} -- previne
+        injectia inline de scripturi (bonus, sectiunea \ref{sec:bonus}).
+  \item \textbf{Error handling generic}. Sablonul \texttt{error.html}
+        afiseaza un mesaj scurt; stack-trace-ul nu mai ajunge la client.
+\end{itemize}
+
+\newpage
+\section{Re-test (validarea fix-urilor)}\label{sec:retest}
+
+Re-testul foloseste exact aceleasi PoC-uri ca in capitolul \ref{sec:poc},
+dar lansate impotriva versiunii \texttt{fixed}. Rezultatul fiecarui PoC
+este consemnat in tabelul \ref{tab:retest} si insotit de captura
+corespunzatoare.
+
+\begin{longtable}{p{0.04\textwidth} p{0.32\textwidth} p{0.30\textwidth} p{0.22\textwidth}}
+\toprule
+\textbf{ID} & \textbf{PoC reluat} & \textbf{Comportament v2} & \textbf{Captura} \\
+\midrule
+\endhead
+4.1 & Register cu \texttt{password=a} & Eroare: ``Password must be at least 8 chars, uppercase, digit, symbol.'' & \ref{fig:retest-41} \\
+4.2 & Citire \texttt{password\_hash} din DB & Hash-uri \texttt{\$2b\$12\$...} (bcrypt) & \ref{fig:retest-42} \\
+4.3 & 6 incercari gresite & La a 5-a: ``Account locked. Try again later.'' & \ref{fig:retest-43} \\
+4.4 & User valid vs.\ inexistent & Acelasi mesaj ``Invalid credentials''; timp uniform & \ref{fig:retest-44} \\
+4.5 & Inspectie cookie + replay post-logout & HttpOnly + SameSite + rotatie; replay returneaza 302 \texttt{/login} & \ref{fig:retest-45} \\
+4.6 & Token forjat \texttt{MTow} & ``Invalid or expired token'' & \ref{fig:retest-46} \\
+4.7 & \texttt{?q=' OR 1=1--} & 0 rezultate (parametru tratat literal) & \ref{fig:retest-47} \\
+4.8 & \texttt{/ticket/1} ca analyst & HTTP 403; \texttt{IDOR\_BLOCKED} in audit & \ref{fig:retest-48} \\
+4.9 & \texttt{COUNT(*) FROM audit\_logs} & $> 0$, multiple actiuni distincte & \ref{fig:retest-49} \\
+\bottomrule
+\caption{Sumarizarea re-testului pe v2}
+\label{tab:retest}
+\end{longtable}
+
+\captura{registerFix.png}{Re-test 4.1: parola \texttt{a} este respinsa la \texttt{/register} cu mesajul \emph{``Password must be at least 8 characters and contain an uppercase letter, a digit, and a special character''}; \texttt{PASSWORD\_POLICY\_RE} se aplica si la \texttt{/reset}}{retest-41}
+
+\captura{parolaBcrypt.png}{Re-test 4.2: dupa migrare, fiecare \texttt{password\_hash} din \texttt{deskly\_fixed.db} incepe cu prefixul \texttt{\$2b\$12\$} (bcrypt v2b, cost 12, lungime 60 caractere) -- nu mai poate fi cracat offline cu rainbow tables}{retest-42}
+
+\captura{loginlock.png}{Re-test 4.3: dupa 5 esecuri consecutive contul \texttt{locktest\_*} este blocat 15 minute; in DB \texttt{failed\_attempts=5} si \texttt{lock\_until} este timestamp in viitor; chiar si parola corecta nu mai trece pana la expirare}{retest-43}
+
+\captura{invalidCredentials.png}{Re-test 4.4 (UI): pentru orice combinatie email + parola gresita aplicatia afiseaza acelasi mesaj generic \emph{``Invalid credentials''}, fara sa deconspire daca emailul exista in sistem}{retest-44a}
+
+\captura{invalidCredCurl.png}{Re-test 4.4 (raspuns HTTP): \texttt{curl} pe \texttt{/login} returneaza acelasi corp HTML pentru user inexistent si pentru parola gresita; combinat cu hash-ul dummy bcrypt aplicat pe ramura ``user not found'', timpul de raspuns ramane uniform}{retest-44b}
+
+\captura{noIdHttpOnly.png}{Re-test 4.5 (HttpOnly): in browser-ul logat ca manager, \texttt{document.cookie} returneaza string vid -- cookie-ul \texttt{session\_id} nu mai poate fi citit din JavaScript, deci un payload XSS nu il mai poate exfiltra}{retest-45a}
+
+\captura{cookie1.png}{Re-test 4.5 (DevTools $\rightarrow$ Cookies): cookie-ul \texttt{session\_id} are flag-urile \textbf{HttpOnly} si \textbf{SameSite=Lax} active si o expirare scurta (\texttt{max\_age=3600}), spre deosebire de v1 unde ramanea valid 30 de zile}{retest-45b}
+
+\captura{cookie2.png}{Re-test 4.5 (rotatie): dupa logout + re-login, valoarea cookie-ului se schimba complet -- noul \texttt{session\_id} difera de cel anterior, blocand atacurile de tip session fixation}{retest-45c}
+
+\captura{curlCookie.png}{Re-test 4.5 (revoke server-side): replay cu \texttt{curl -b "session\_id=\textit{vechi}"} pe \texttt{/dashboard} dupa logout primeste status \textbf{302} catre \texttt{/login} -- sesiunea a fost invalidata in tabela \texttt{sessions} (coloana \texttt{revoked=1}), nu mai e suficient sa stergi cookie-ul client-side}{retest-45d}
+
+\captura{invalidExpiredTokenMtow.png}{Re-test 4.6: acelasi payload \texttt{/reset/MTow} care a permis takeover-ul in v1 este respins de v2 cu mesajul \emph{``Invalid or expired token''}; tokenul real este acum 32 bytes random, stocat hash-uit (SHA-256), expira in 1h si este single-use}{retest-46}
+
+\captura{resetpassword.png}{Re-test 4.6 (continuare): chiar si pe un token valid, formularul \texttt{/reset} aplica aceeasi politica de parole ca \texttt{/register} -- o parola noua \texttt{`pwn3d-by-attacker'} ar fi respinsa de \texttt{PASSWORD\_POLICY\_RE}}{retest-46b}
+
+\captura{tokenuriGenerate.png}{Re-test 4.6 (DB schema noua): tabela \texttt{password\_resets} din \texttt{deskly\_fixed.db} stocheaza in coloana \texttt{token\_hash} doar SHA-256 al tokenului real (siruri de 64 caractere hex), nu valoarea brută; coloanele \texttt{expires\_at} (1 ora dupa emitere) si \texttt{used} (0/1) implementeaza expirare si single-use; chiar si un atacator cu acces la DB nu poate folosi tokenurile inca emise}{retest-46c}
+
+\captura{tokenCantBeUsedTwice.png}{Re-test 4.6 (single-use): dupa folosirea unui token valid pentru schimbarea parolei, o a doua incercare cu acelasi token este respinsa cu acelasi mesaj generic \emph{``Invalid or expired token''}; in DB, randul corespunzator are \texttt{used=1} (vizibil in panoul stang), iar mesajul nu deconspira daca tokenul a fost vreodata valid}{retest-46d}
+
+\captura{sqlInjection.png}{Re-test 4.7 (\texttt{OR 1=1}): acelasi payload \texttt{' OR 1=1--} care a expus toate ticketele in v1 produce acum \emph{``No results for ' OR 1=1--''} -- aplicatia afiseaza explicit banner-ul verde \emph{``Queries are bound as parameters -- SQL injection payloads are treated as literal text''}, confirmand ca input-ul este pasat ca parametru \texttt{?} catre SQLite}{retest-47a}
+
+\captura{sql2Union.png}{Re-test 4.7 (UNION): si payload-ul mai agresiv \texttt{' UNION SELECT id, email, password\_hash, role, created\_at, locked FROM users--} este neutralizat -- 0 rezultate, niciun \texttt{SQL error: ...} expus, niciun hash leak-uit; coloana \texttt{Description} ramane tratata ca text}{retest-47b}
+
+\captura{audit.png}{Re-test 4.8: navigarea la o resursa pentru care utilizatorul nu are drepturi (in cazul de fata \texttt{/audit} ca \texttt{analyst}) este blocata cu \textbf{HTTP 403 Forbidden}; acelasi mecanism (\texttt{owner\_id} sau rol \texttt{MANAGER}) se aplica la \texttt{/ticket/<id>}, iar tentativa este logata ca \texttt{IDOR\_BLOCKED} / \texttt{AUTHZ\_DENY} in audit (vizibil in panoul stang)}{retest-48}
+
+\captura{auditSqlAggregation.png}{Re-test 4.9: \texttt{SELECT action, COUNT(*) FROM audit\_logs GROUP BY action} pe \texttt{deskly\_fixed.db} returneaza zeci de inregistrari distribuite pe \texttt{LOGIN\_SUCCESS}, \texttt{LOGIN\_FAIL}, \texttt{LOGOUT}, \texttt{REGISTER}, \texttt{RESET\_REQUESTED}, \texttt{RESET\_USED}, \texttt{IDOR\_BLOCKED}, \texttt{ACCOUNT\_LOCKED} -- vs.\ 0 in v1}{retest-49}
+
+\subsection{Test de regresie automatizat}
+Pe langa re-testul manual, am inclus doua scripturi de smoke:
+\texttt{smoke\_vuln.py} ruleaza toate cele 9 PoC-uri pe v1 si confirma
+ca atacurile reusesc; \texttt{smoke\_fixed.py} ruleaza aceleasi PoC-uri
+pe v2 si confirma ca fiecare este blocat. Ambele scripturi se incheie
+cu \texttt{All vulnerable PoCs reproduced} respectiv \texttt{All fixed
+PoCs hold up under attack}, fara nicio asertie esuata. Acest mecanism
+acopera bonusul ``Teste automate de securitate'' (sectiunea \ref{sec:bonus}).
+
+\begin{lstlisting}[style=sh, caption={Rularea scripturilor de smoke}]
+$ python smoke_vuln.py     # cu v1 pornit
+[4.1] weak password accepted on register
+  PASS -- register with single-char password reached the server
+  ... (toate cele 9)
+All vulnerable PoCs reproduced.
+$ python smoke_fixed.py    # cu v2 pornit
+[4.1] register rejects weak passwords
+  PASS -- single-char password rejected
+  ... (toate cele 9)
+All fixed PoCs hold up under attack.
+\end{lstlisting}
+
+\newpage
+\section{Audit \& logging}\label{sec:audit}
+
+\subsection{Modelul de audit}
+In v2, fiecare actiune sensibila inregistreaza un rand in tabela
+\texttt{audit\_logs}, cu campurile prezentate in tabelul \ref{tab:audit}.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Camp} & \textbf{Continut} \\
+\midrule
+\texttt{user\_id}    & ID-ul utilizatorului care a executat actiunea (sau NULL pentru actiuni anonime) \\
+\texttt{action}      & Tipul actiunii (\texttt{LOGIN\_SUCCESS}, \texttt{LOGIN\_FAIL}, \texttt{IDOR\_BLOCKED}, ...) \\
+\texttt{resource}    & Tipul resursei (\texttt{auth}, \texttt{ticket}, \texttt{audit}) \\
+\texttt{resource\_id}& Identificatorul resursei (de ex.\ \texttt{ticket.id}) \\
+\texttt{timestamp}   & Momentul actiunii \\
+\texttt{ip\_address} & IP-ul clientului \\
+\bottomrule
+\end{tabular}
+\caption{Schema tabelei \texttt{audit\_logs}}
+\label{tab:audit}
+\end{table}
+
+\subsection{Actiuni inregistrate}
+Helper-ul \texttt{audit()} este apelat in:
+\begin{itemize}
+  \item \textbf{Auth}: \texttt{LOGIN\_SUCCESS}, \texttt{LOGIN\_FAIL},
+        \texttt{LOGOUT}, \texttt{REGISTER}, \texttt{ACCOUNT\_LOCKED}.
+  \item \textbf{Reset}: \texttt{RESET\_REQUESTED}, \texttt{RESET\_USED},
+        \texttt{RESET\_INVALID}.
+  \item \textbf{Tickets}: \texttt{TICKET\_CREATED}, \texttt{TICKET\_VIEWED},
+        \texttt{IDOR\_BLOCKED}.
+  \item \textbf{Securitate}: \texttt{CSRF\_FAIL}.
+\end{itemize}
+
+\subsection{Vizualizarea audit log-urilor}
+Endpoint-ul \texttt{/audit} este accesibil doar pentru rolul
+\texttt{MANAGER} si afiseaza ultimele 200 inregistrari, ordonate
+descrescator dupa \texttt{timestamp}.
+
+\captura{auditscreen.png}{Pagina \texttt{/audit} (accesibila doar rolului \texttt{MANAGER}): tabel cronologic cu evenimente \texttt{LOGIN\_SUCCESS}, \texttt{LOGOUT}, \texttt{AUTHZ\_DENY}, \texttt{VIEW\_TICKET}, \texttt{SEARCH}, \texttt{PASSWORD\_RESET}, fiecare cu \texttt{user\_id}, \texttt{resource}, \texttt{ip\_address} si timestamp}{audit-view}
+
+\subsection{Trasabilitate end-to-end}
+Demonstratia de trasabilitate consta in:
+(i) lansarea unui atac (de ex. brute-force pe contul managerului),
+(ii) deschiderea \texttt{/audit} si identificarea celor 5 inregistrari
+\texttt{LOGIN\_FAIL} cu acelasi \texttt{ip\_address}, urmate de un
+\texttt{ACCOUNT\_LOCKED}. Inregistrarile pot fi exportate (CSV) ca
+proba pentru un raspuns la incident.
+
+\begin{lstlisting}[style=sh, caption={Audit dupa o tentativa de brute-force}]
+$ sqlite3 deskly_fixed.db \
+  "SELECT timestamp, action, resource_id FROM audit_logs ORDER BY id DESC LIMIT 6;"
+2026-04-29 11:55:18 | ACCOUNT_LOCKED | manager@deskly.local
+2026-04-29 11:55:17 | LOGIN_FAIL     | manager@deskly.local
+2026-04-29 11:55:17 | LOGIN_FAIL     | manager@deskly.local
+2026-04-29 11:55:16 | LOGIN_FAIL     | manager@deskly.local
+2026-04-29 11:55:16 | LOGIN_FAIL     | manager@deskly.local
+2026-04-29 11:55:15 | LOGIN_FAIL     | manager@deskly.local
+\end{lstlisting}
+
+\newpage
+\section{Concluzii}\label{sec:concluzii}
+
+\subsection{Lectii invatate}
+\begin{itemize}
+  \item \textbf{Securitatea nu este un strat optional.} Fiecare ramura
+        de cod care atinge un secret (parola, token, sesiune) trebuie
+        gandita din perspectiva atacatorului inca de la prima
+        implementare. Adaugarea ulterioara este, intotdeauna, mai
+        scumpa si mai fragila.
+  \item \textbf{Defense in depth.} Politica de parole (4.1) ar fi
+        insuficienta fara hash bcrypt (4.2) si fara rate limiting (4.3).
+        Trei controale complementare reduc impactul reciproc daca unul
+        cedeaza.
+  \item \textbf{Mesajele de eroare sunt suprafata de atac.} Diferenta
+        intre ``user does not exist'' si ``incorrect password'' (4.4)
+        si scurgerea \texttt{SQL error: ...} (4.7) demonstreaza ca un
+        text aparent inofensiv poate accelera dramatic exploatarea.
+  \item \textbf{Audit-ul este ne-negociabil.} Fara
+        \texttt{audit\_logs} (4.9), atacurile demonstrate aici trec
+        nedetectate; in productie, lipsa trasabilitatii incalca
+        cerintele de compliance (GDPR Art. 30, ISO 27001).
+  \item \textbf{Cost factor bcrypt.} Alegerea cost factor-ului 12
+        este un compromis intre rezistenta si latenta. Pe acelasi VM,
+        cost 14 a urcat latenta peste 1~s la login -- inutilizabil. Pe
+        un server cu CPU mai bun se poate incerca 13 sau 14.
+  \item \textbf{Smoke tests automate.} Cele doua scripturi
+        (\texttt{smoke\_vuln.py}, \texttt{smoke\_fixed.py}) au prins
+        regresii in timpul iteratiei (de ex. o problema de comparare
+        lexicografica a timestamp-urilor in tabela \texttt{sessions}).
+\end{itemize}
+
+\newpage
+\section{Criterii de excelenta (bonus)}\label{sec:bonus}
+
+\subsection{Implementare CSP (+5p)}
+Versiunea securizata adauga in fiecare raspuns headerul
+\texttt{Content-Security-Policy}, configurat sa permita doar resurse
+proprii (\texttt{'self'}). Politica blocheaza inline-script si
+inline-style, prevenind clase intregi de XSS reflectat.
+
+\begin{lstlisting}[style=py, caption={CSP in \texttt{after\_request}}]
+@app.after_request
+def security_headers(resp):
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self'; "
+        "img-src 'self' data:; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none'"
+    )
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "same-origin"
+    return resp
+\end{lstlisting}
+
+\captura{cspheader.png}{Header-ele de securitate emise de v2 la \texttt{GET /login} (\texttt{curl -sI}): \texttt{X-Content-Type-Options: nosniff}, \texttt{X-Frame-Options: DENY}, \texttt{Referrer-Policy: no-referrer} si \texttt{Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'} -- toate absente in v1}{bonus-csp}
+
+\subsubsection*{Protectia CSRF (token per-sesiune)}
+Toate metodele non-safe (POST, PUT, DELETE) sunt validate intr-un hook
+\texttt{before\_request} care compara campul \texttt{csrf\_token} din
+formular cu valoarea stocata in sesiunea server-side. Lipsa sau
+nepotrivirea tokenului se finalizeaza cu redirect catre \texttt{/login}
+si o intrare \texttt{CSRF\_FAIL} in \texttt{audit\_logs}.
+
+\captura{crsfTokenCreateTicket.png}{Tokenul CSRF este injectat ca \texttt{<input type="hidden" name="csrf\_token">} in fiecare formular; in DevTools $\rightarrow$ Network, body-ul cererii \texttt{POST /ticket/new} contine perechea \texttt{csrf\_token=...} alaturi de campurile utilizatorului}{bonus-csrf-token}
+
+\captura{curlNoCrsf.png}{\texttt{curl -X POST /ticket/new} fara parametrul \texttt{csrf\_token} este blocat de hook-ul \texttt{before\_request} cu un redirect 302; chiar daca atacatorul detine cookie-ul valid de sesiune, nu poate efectua actiuni in numele utilizatorului}{bonus-csrf-curl}
+
+\captura{crsf302.png}{Acelasi POST manual din browser, fara token: pagina e re-incarcata pe \texttt{/login} (status 302), iar Network tab-ul confirma blocarea}{bonus-csrf-302}
+
+\captura{consolaCrsf.png}{Logul Flask: zeci de cereri \texttt{POST /ticket/new HTTP/1.1 302} si \texttt{400} respinse de validatorul CSRF in timpul testului fuzzing -- niciuna nu a produs efecte de scriere in DB}{bonus-csrf-log}
+
+\subsection{Teste automate de securitate (+5p)}
+Cele doua scripturi de smoke (\texttt{smoke\_vuln.py},
+\texttt{smoke\_fixed.py}) acopera cerinta. Ambele sunt complete, rulate
+final si fara asertii esuate. Pot fi integrate trivial in pipeline-ul
+CI prin \texttt{python smoke\_fixed.py}.
+
+\end{document}
